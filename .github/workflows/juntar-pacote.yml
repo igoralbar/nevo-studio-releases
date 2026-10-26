@@ -1,0 +1,39 @@
+# Junta as partes do pacote enviadas pelo navegador (limite de 10MB por arquivo),
+# confere o SHA256, sobe o pacote inteiro no release e apaga as partes.
+name: Juntar pacote
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag do release
+        required: true
+        default: v0.6.1
+      arquivo:
+        description: Nome final do pacote
+        required: true
+        default: nevo-studio-0.6.1-x64.nsis.7z
+      sha256:
+        description: SHA256 esperado do pacote
+        required: true
+permissions:
+  contents: write
+jobs:
+  juntar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag }}
+      ARQ: ${{ inputs.arquivo }}
+      SHA: ${{ inputs.sha256 }}
+    steps:
+      - name: Baixar partes
+        run: gh release download "$TAG" -p 'pacote.part*'
+      - name: Juntar e conferir
+        run: |
+          cat $(ls pacote.part* | sort) > "$ARQ"
+          echo "$SHA  $ARQ" | sha256sum -c -
+      - name: Subir pacote e apagar partes
+        run: |
+          gh release upload "$TAG" "$ARQ" --clobber
+          for p in pacote.part*; do gh release delete-asset "$TAG" "$p" -y; done
